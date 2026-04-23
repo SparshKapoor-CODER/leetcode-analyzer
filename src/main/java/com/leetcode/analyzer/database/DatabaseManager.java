@@ -281,7 +281,8 @@ public class DatabaseManager {
             ps.executeUpdate();
 
             // Retrieve generated id
-            try (ResultSet rs = ps.getGeneratedKeys()) {
+            try (Statement idStmt = connection.createStatement();
+                 ResultSet rs = idStmt.executeQuery("SELECT last_insert_rowid()")) {
                 if (rs.next() && user.getId() == 0) user.setId(rs.getInt(1));
             }
         }
@@ -337,7 +338,8 @@ public class DatabaseManager {
             ps.setString(11, solution.getLanguage());
             ps.executeUpdate();
 
-            try (ResultSet rs = ps.getGeneratedKeys()) {
+            try (Statement idStmt = connection.createStatement();
+                 ResultSet rs = idStmt.executeQuery("SELECT last_insert_rowid()")) {
                 if (rs.next()) solution.setId(rs.getInt(1));
             }
         }
