@@ -406,26 +406,51 @@ public class DatabaseManager {
     // ─── Stats helpers ────────────────────────────────────────────────────────
 
     private void updateCategoryStats(int userId, Category category, boolean accepted) throws SQLException {
-        String sql = "INSERT INTO category_stats (user_id, category, solved_count, attempted_count) " +
-                     "VALUES (?, ?, ?, 1) " +
-                     "ON CONFLICT(user_id, category) DO UPDATE SET " +
-                     "solved_count = solved_count + ?, attempted_count = attempted_count + 1";
-        try (PreparedStatement ps = connection.prepareStatement(sql)) {
-            int solved = accepted ? 1 : 0;
+        // Read existing counts first
+        int existingSolved = 0, existingAttempted = 0;
+        String select = "SELECT solved_count, attempted_count FROM category_stats " +
+                "WHERE user_id = ? AND category = ?";
+        try (PreparedStatement ps = connection.prepareStatement(select)) {
             ps.setInt(1, userId);
             ps.setString(2, category.name());
-            ps.setInt(3, solved);
-            ps.setInt(4, solved);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    existingSolved    = rs.getInt("solved_count");
+                    existingAttempted = rs.getInt("attempted_count");
+                }
+            }
+        }
+
+        // Write back with incremented values
+        String upsert = "INSERT OR REPLACE INTO category_stats " +
+                "(user_id, category, solved_count, attempted_count) VALUES (?, ?, ?, ?)";
+        try (PreparedStatement ps = connection.prepareStatement(upsert)) {
+            ps.setInt(1, userId);
+            ps.setString(2, category.name());
+            ps.setInt(3, existingSolved    + (accepted ? 1 : 0));
+            ps.setInt(4, existingAttempted + 1);
             ps.executeUpdate();
         }
     }
 
     private void updateDifficultyStats(int userId, Difficulty difficulty) throws SQLException {
-        String sql = "INSERT INTO difficulty_stats (user_id, difficulty, solved_count) VALUES (?, ?, 1) " +
-                     "ON CONFLICT(user_id, difficulty) DO UPDATE SET solved_count = solved_count + 1";
-        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+        int existingCount = 0;
+        String select = "SELECT solved_count FROM difficulty_stats " +
+                "WHERE user_id = ? AND difficulty = ?";
+        try (PreparedStatement ps = connection.prepareStatement(select)) {
             ps.setInt(1, userId);
             ps.setString(2, difficulty.name());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) existingCount = rs.getInt("solved_count");
+            }
+        }
+
+        String upsert = "INSERT OR REPLACE INTO difficulty_stats " +
+                "(user_id, difficulty, solved_count) VALUES (?, ?, ?)";
+        try (PreparedStatement ps = connection.prepareStatement(upsert)) {
+            ps.setInt(1, userId);
+            ps.setString(2, difficulty.name());
+            ps.setInt(3, existingCount + 1);
             ps.executeUpdate();
         }
     }
